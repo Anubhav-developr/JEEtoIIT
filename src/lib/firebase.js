@@ -31,22 +31,25 @@ let appCheck = null;
 
 if (firebaseReady) {
   app = initializeApp(firebaseConfig);
+
+  // Initialize App Check BEFORE using Firebase services.
+  const siteKey = import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY;
+
+  if (!siteKey) {
+    throw new Error(
+      "App Check site key missing. Check VITE_RECAPTCHA_V3_SITE_KEY in Vercel.",
+    );
+  }
+
+  appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(siteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+
+  // Initialize Firebase services only after App Check.
   auth = getAuth(app);
   db = getFirestore(app);
   functions = getFunctions(app, "us-central1");
-
-  const siteKey = import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY;
-
-  if (siteKey) {
-    appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider(siteKey),
-      isTokenAutoRefreshEnabled: true,
-    });
-  } else {
-    console.error(
-      "App Check Site Key missing: check VITE_RECAPTCHA_V3_SITE_KEY in .env",
-    );
-  }
 }
 
 export { app, auth, db, functions, appCheck };
