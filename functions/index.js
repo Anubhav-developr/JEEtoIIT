@@ -55,6 +55,7 @@ async function enforceRateLimit(ip) {
   });
 }
 
+
 exports.loginWithAccessCode = onCall(
   {
     enforceAppCheck: true,
@@ -67,66 +68,94 @@ exports.loginWithAccessCode = onCall(
       request.rawRequest?.headers?.["x-forwarded-for"] ||
       "unknown";
 
-    console.log("[LOGIN] Step 1: checking rate limit");
+    console.log("[LOGIN] Handler entered", {
+      appCheckPresent: Boolean(request.app),
+      authPresent: Boolean(request.auth),
+    });
 
+    // Step 1: Apply rate limiting.
     try {
       await enforceRateLimit(ip);
-      console.log("[LOGIN] Step 2: rate limit passed");
+      console.log("[LOGIN] Rate limit passed");
     } catch (error) {
       console.error("[LOGIN] RATE_LIMIT_FAILED", error);
-      throw new HttpsError("internal", "Login database check failed.");
+      throw new HttpsError(
+        "internal",
+        "Login security check failed. Please try again later.",
+      );
     }
 
+    // Step 2: Normalize and validate the code before querying Firestore.
     const code = String(request.data?.code || "")
       .trim()
       .toUpperCase();
 
-    console.log("[LOGIN] Step 3: reading access code document");
+    if (!CODE_PATTERN.test(code)) {
+      console.warn("[LOGIN] Rejected: invalid code format", {
+        codeLength: code.length,
+      });
+      throw new HttpsError("unauthenticated", "Invalid access code.");
+    }
 
+    // Step 3: Read the access-code document exactly once.
     let codeSnap;
 
     try {
       codeSnap = await db.collection("accessCodes").doc(code).get();
-      console.log("[LOGIN] Step 4: access code read completed");
+
+      console.log("[LOGIN] Access-code lookup completed", {
+        documentExists: codeSnap.exists,
+      });
     } catch (error) {
       console.error("[LOGIN] ACCESS_CODE_READ_FAILED", error);
-      throw new HttpsError("internal", "Access code database lookup failed.");
+      throw new HttpsError("internal", "Access-code database lookup failed.");
     }
 
-    if (!CODE_PATTERN.test(code)) {
-      throw new HttpsError("unauthenticated", "Invalid access code.");
-    }
-
-    // The browser cannot read accessCodes. Only this Admin SDK function can verify it.
-    codeSnap = await db.collection("accessCodes").doc(code).get();
     if (!codeSnap.exists) {
+      console.warn("[LOGIN] Rejected: access-code document missing");
       throw new HttpsError("unauthenticated", "Invalid access code.");
     }
 
     const record = codeSnap.data();
-    if (
-      record.active !== true ||
-      typeof record.uid !== "string" ||
-      !record.uid.trim()
-    ) {
+
+    const isActive = record.active === true;
+    const hasValidUid =
+      typeof record.uid === "string" && record.uid.trim().length > 0;
+
+    console.log("[LOGIN] Access-code state checked", {
+      active: isActive,
+      uidValid: hasValidUid,
+    });
+
+    if (!isActive || !hasValidUid) {
+      console.warn("[LOGIN] Rejected: disabled or incomplete code record");
       throw new HttpsError("unauthenticated", "Invalid access code.");
     }
 
+    // Step 4: Generate the Firebase custom token.
     try {
       const customToken = await getAuth().createCustomToken(record.uid, {
         accessCodeLogin: true,
       });
+
+      console.log("[LOGIN] Custom token created successfully");
+
       return {
         customToken,
         displayName:
           typeof record.displayName === "string" ? record.displayName : "",
       };
     } catch (error) {
-      console.error("Could not create custom token:", error);
-      throw new HttpsError("internal", "Unable to complete login.");
+      console.error("[LOGIN] CUSTOM_TOKEN_FAILED", error);
+
+      throw new HttpsError(
+        "internal",
+        "Unable to complete login. Please contact the portal admin.",
+      );
     }
   },
 );
+
 
 exports.approveStudentRegistration = onCall(
   {
