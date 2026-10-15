@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User data is private to the Firebase UID established by the code-login function.
+    match /artifacts/{appId}/users/{userId}/userData/{documentId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Access codes and rate-limit records are server-only. Never expose them to clients.
+    match /accessCodes/{code} {
+      allow read, write: if false;
+    }
+    match /loginRateLimits/{recordId} {
+      allow read, write: if false;
+    }
+
+    // Deny all other client access unless you intentionally add a narrower rule.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
