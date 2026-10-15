@@ -309,12 +309,18 @@ exports.submitStudentRegistration = onCall(
     timeoutSeconds: 30,
   },
   async (request) => {
+    console.log("[REGISTRATION DEBUG] Handler entered", {
+      authPresent: Boolean(request.auth),
+      appCheckPresent: Boolean(request.app),
+    });
     const ip =
       request.rawRequest?.ip ||
       request.rawRequest?.headers?.["x-forwarded-for"] ||
       "unknown";
 
-    await enforceRateLimit(ip);
+   console.log("[REGISTRATION DEBUG] Before rate limit");
+   await enforceRateLimit(ip);
+   console.log("[REGISTRATION DEBUG] After rate limit");
 
     const name = String(request.data?.name || "").trim();
     const targetExam = String(request.data?.targetExam || "").trim();
