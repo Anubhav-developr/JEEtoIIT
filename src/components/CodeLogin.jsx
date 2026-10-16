@@ -1,46 +1,78 @@
-import React, { useState } from 'react';
-import { signInWithCustomToken } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
-import { BrainCircuit, KeyRound, ShieldCheck, LoaderCircle } from 'lucide-react';
-import { auth, functions, firebaseReady } from '../lib/firebase';
+import React, { useState } from "react";
+import { signInWithCustomToken } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import {
+  BrainCircuit,
+  KeyRound,
+  ShieldCheck,
+  LoaderCircle,
+} from "lucide-react";
+
+import { getToken } from "firebase/app-check";
+import { auth, appCheck, functions, firebaseReady } from "../lib/firebase";
 import StudentRegistration from "./StudentRegistration";
 
 export default function CodeLogin() {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showRegistration, setShowRegistration] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
-    setError('');
+    setError("");
     const normalized = code.trim().toUpperCase();
 
     if (!/^[A-Z0-9]{5}$/.test(normalized)) {
-      setError('Code exactly 5 characters ka hona chahiye: A–Z aur 0–9.');
+      setError("Code exactly 5 characters ka hona chahiye: A–Z aur 0–9.");
       return;
     }
     if (!firebaseReady || !auth || !functions) {
-      setError('Firebase configuration missing hai. Project root ki .env file setup karke dev server restart karein.');
+      setError(
+        "Firebase configuration missing hai. Project root ki .env file setup karke dev server restart karein.",
+      );
       return;
     }
 
     setBusy(true);
     try {
-      const loginWithAccessCode = httpsCallable(functions, 'loginWithAccessCode');
+      if (!appCheck) {
+        throw new Error("APP_CHECK_NOT_INITIALIZED");
+      }
+
+      const appCheckResult = await getToken(appCheck, false);
+
+      if (!appCheckResult.token) {
+        throw new Error("APP_CHECK_TOKEN_MISSING");
+      }
+
+      console.info("[App Check] Login token acquired");
+      const loginWithAccessCode = httpsCallable(
+        functions,
+        "loginWithAccessCode",
+      );
       const result = await loginWithAccessCode({ code: normalized });
       const customToken = result.data?.customToken;
-      if (!customToken) throw new Error('Login token receive nahi hua.');
+      if (!customToken) throw new Error("Login token receive nahi hua.");
       await signInWithCustomToken(auth, customToken);
     } catch (err) {
-      console.error('Code login failed:', err);
-      const codeName = err?.code || '';
-      if (codeName.includes('resource-exhausted')) {
-        setError('Bahut zyada attempts hue hain. 15 minutes baad dobara try karein.');
-      } else if (codeName.includes('failed-precondition') || codeName.includes('app-check')) {
-        setError('Security verification fail hui. Firebase App Check configuration check karein.');
+      console.error("Code login failed:", err);
+      const codeName = err?.code || "";
+      if (codeName.includes("resource-exhausted")) {
+        setError(
+          "Bahut zyada attempts hue hain. 15 minutes baad dobara try karein.",
+        );
+      } else if (
+        codeName.includes("failed-precondition") ||
+        codeName.includes("app-check")
+      ) {
+        setError(
+          "Security verification fail hui. Firebase App Check configuration check karein.",
+        );
       } else {
-        setError('Code invalid, disabled, ya server setup incomplete hai. Code check karke dobara try karein.');
+        setError(
+          "Code invalid, disabled, ya server setup incomplete hai. Code check karke dobara try karein.",
+        );
       }
     } finally {
       setBusy(false);

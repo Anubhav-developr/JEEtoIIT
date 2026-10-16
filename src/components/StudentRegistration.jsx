@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import { ArrowLeft, UserPlus, LoaderCircle } from "lucide-react";
-import { functions, firebaseReady } from "../lib/firebase";
+
+import { getToken } from "firebase/app-check";
+import { appCheck, functions, firebaseReady } from "../lib/firebase";
 
 export default function StudentRegistration({ onBack }) {
   const [name, setName] = useState("");
@@ -24,6 +26,17 @@ export default function StudentRegistration({ onBack }) {
     setBusy(true);
 
     try {
+      if (!appCheck) {
+        throw new Error("APP_CHECK_NOT_INITIALIZED");
+      }
+
+      const appCheckResult = await getToken(appCheck, false);
+
+      if (!appCheckResult.token) {
+        throw new Error("APP_CHECK_TOKEN_MISSING");
+      }
+
+      console.info("[App Check] Registration token acquired");
       const submitRegistration = httpsCallable(
         functions,
         "submitStudentRegistration",
