@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { SYLLABUS_DATA } from '../data/studyData';
 import { Zap, Activity, CheckCircle2, Target, BookOpen, Brain, Clock3, TrendingUp } from 'lucide-react';
-
+import SyllabusProgress from "./SyllabusProgress";
 const ACTIVE_CATEGORIES = ['PYQ Practice', 'Problem Solving / DPP', 'Mock Test', 'Question Revision'];
 const PASSIVE_CATEGORIES = ['Video Lecture', 'Notes / Textbook', 'Formula Revision', 'Concept Reading'];
 
@@ -113,36 +113,122 @@ export default function Dashboard({ state }) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-white md:text-3xl">JEE 2027 Command Center 🚀</h2>
-        <p className="mt-1 text-sm text-slate-400">Saumya's study time, practice quality and consistency at a glance.</p>
+        <h2 className="text-2xl font-extrabold tracking-tight text-white md:text-3xl">
+          JEE 2027 Command Center 🚀
+        </h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Saumya's study time, practice quality and consistency at a glance.
+        </p>
+      </div>
+      <SyllabusProgress completedSubtopics={completedSubtopics} />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Active Study"
+          value={formatDuration(analytics.activeSec)}
+          hint={`${analytics.activeRatio}% of all tracked study`}
+          icon={Zap}
+          color="text-emerald-400"
+          progress={analytics.activeRatio}
+        />
+        <StatCard
+          title="Passive Study"
+          value={formatDuration(analytics.passiveSec)}
+          hint="Lectures, notes, formulas & reading"
+          icon={BookOpen}
+          color="text-violet-400"
+        />
+        <StatCard
+          title="Today's Focus"
+          value={formatDuration(analytics.todayActive + analytics.todayPassive)}
+          hint={`Active ${formatDuration(analytics.todayActive)} · Passive ${formatDuration(analytics.todayPassive)}`}
+          icon={Clock3}
+          color="text-cyan-400"
+        />
+        <StatCard
+          title="Last 7 Days"
+          value={formatDuration(analytics.weekSec)}
+          hint="Tracked study time"
+          icon={TrendingUp}
+          color="text-amber-400"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Active Study" value={formatDuration(analytics.activeSec)} hint={`${analytics.activeRatio}% of all tracked study`} icon={Zap} color="text-emerald-400" progress={analytics.activeRatio} />
-        <StatCard title="Passive Study" value={formatDuration(analytics.passiveSec)} hint="Lectures, notes, formulas & reading" icon={BookOpen} color="text-violet-400" />
-        <StatCard title="Today's Focus" value={formatDuration(analytics.todayActive + analytics.todayPassive)} hint={`Active ${formatDuration(analytics.todayActive)} · Passive ${formatDuration(analytics.todayPassive)}`} icon={Clock3} color="text-cyan-400" />
-        <StatCard title="Last 7 Days" value={formatDuration(analytics.weekSec)} hint="Tracked study time" icon={TrendingUp} color="text-amber-400" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Today's Questions" value={analytics.todayQs} hint="/ 100 daily goal" icon={Activity} color="text-cyan-400" progress={analytics.todayQs} />
-        <StatCard title="Overall Accuracy" value={`${analytics.accuracy}%`} hint={`${analytics.totalCorrect} correct of ${analytics.totalQs} attempted`} icon={Target} color="text-rose-400" />
-        <StatCard title="PYQ Mastery (19–26)" value={`${analytics.pyqPct}%`} hint={`${completedPYQs.length} of ${analytics.totalPYQ} chapter-year checkoffs`} icon={CheckCircle2} color="text-indigo-400" progress={analytics.pyqPct} />
-        <StatCard title="Active Ratio Goal" value={analytics.activeRatio >= 70 ? 'On target' : 'Keep going'} hint="Aim for 70%+ active study" icon={Brain} color={analytics.activeRatio >= 70 ? 'text-emerald-400' : 'text-amber-400'} progress={analytics.activeRatio} />
+        <StatCard
+          title="Today's Questions"
+          value={analytics.todayQs}
+          hint="/ 100 daily goal"
+          icon={Activity}
+          color="text-cyan-400"
+          progress={analytics.todayQs}
+        />
+        <StatCard
+          title="Overall Accuracy"
+          value={`${analytics.accuracy}%`}
+          hint={`${analytics.totalCorrect} correct of ${analytics.totalQs} attempted`}
+          icon={Target}
+          color="text-rose-400"
+        />
+        <StatCard
+          title="PYQ Mastery (19–26)"
+          value={`${analytics.pyqPct}%`}
+          hint={`${completedPYQs.length} of ${analytics.totalPYQ} chapter-year checkoffs`}
+          icon={CheckCircle2}
+          color="text-indigo-400"
+          progress={analytics.pyqPct}
+        />
+        <StatCard
+          title="Active Ratio Goal"
+          value={analytics.activeRatio >= 70 ? "On target" : "Keep going"}
+          hint="Aim for 70%+ active study"
+          icon={Brain}
+          color={
+            analytics.activeRatio >= 70 ? "text-emerald-400" : "text-amber-400"
+          }
+          progress={analytics.activeRatio}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="flex h-80 flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
           <h3 className="mb-3 font-bold text-white">Active vs Passive Study</h3>
-          {analytics.totalSec === 0 ? <div className="flex flex-1 items-center justify-center text-center text-sm text-slate-500">Start and save a timer session to see your study split here.</div> : (
+          {analytics.totalSec === 0 ? (
+            <div className="flex flex-1 items-center justify-center text-center text-sm text-slate-500">
+              Start and save a timer session to see your study split here.
+            </div>
+          ) : (
             <div className="min-h-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="45%" innerRadius={58} outerRadius={88} paddingAngle={4} dataKey="value" stroke="none">
-                    {pieData.map(entry => <Cell key={entry.name} fill={entry.color} />)}
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={58}
+                    outerRadius={88}
+                    paddingAngle={4}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
                   </Pie>
-                  <RechartsTooltip formatter={value => [formatDuration(value), 'Time']} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: 8 }} />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
+                  <RechartsTooltip
+                    formatter={(value) => [formatDuration(value), "Time"]}
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      borderColor: "#1e293b",
+                      borderRadius: 8,
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: 12, color: "#cbd5e1" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -150,15 +236,43 @@ export default function Dashboard({ state }) {
         </section>
         <section className="flex h-80 flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
           <h3 className="mb-3 font-bold text-white">Study Time by Subject</h3>
-          {analytics.totalSec === 0 ? <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Your Physics, Chemistry and Maths time will appear here.</div> : (
+          {analytics.totalSec === 0 ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+              Your Physics, Chemistry and Maths time will appear here.
+            </div>
+          ) : (
             <div className="min-h-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subjectData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                <BarChart
+                  data={subjectData}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <RechartsTooltip formatter={value => [`${value} hrs`, 'Study time']} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: 8 }} />
-                  <Bar dataKey="hours" name="Hours" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                  <XAxis
+                    dataKey="subject"
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={{ stroke: "#334155" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <RechartsTooltip
+                    formatter={(value) => [`${value} hrs`, "Study time"]}
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      borderColor: "#1e293b",
+                      borderRadius: 8,
+                    }}
+                  />
+                  <Bar
+                    dataKey="hours"
+                    name="Hours"
+                    fill="#6366f1"
+                    radius={[6, 6, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -167,40 +281,106 @@ export default function Dashboard({ state }) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <CategoryList title="Active Study Breakdown" entries={analytics.activeByCategory} icon={Target} tone="text-emerald-400" />
-        <CategoryList title="Passive Study Breakdown" entries={analytics.passiveByCategory} icon={BookOpen} tone="text-violet-400" />
+        <CategoryList
+          title="Active Study Breakdown"
+          entries={analytics.activeByCategory}
+          icon={Target}
+          tone="text-emerald-400"
+        />
+        <CategoryList
+          title="Passive Study Breakdown"
+          entries={analytics.passiveByCategory}
+          icon={BookOpen}
+          tone="text-violet-400"
+        />
       </div>
 
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
         <h3 className="mb-4 font-bold text-white">Recent Study Sessions</h3>
-        {studySessions.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No saved sessions yet. Use the Study Timer to start building your analytics.</p> : (
+        {studySessions.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-500">
+            No saved sessions yet. Use the Study Timer to start building your
+            analytics.
+          </p>
+        ) : (
           <div className="space-y-3">
-            {[...studySessions].sort((a, b) => (b.timestamp || b.completedAt || 0) - (a.timestamp || a.completedAt || 0)).slice(0, 8).map(session => (
-              <div key={session.id || `${session.timestamp}-${session.category}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-md px-2 py-1 text-[10px] font-extrabold uppercase ${session.type === 'active' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-violet-500/10 text-violet-300'}`}>{session.type === 'active' ? 'Active' : 'Passive'}</span>
-                    <span className="text-sm font-bold text-white">{session.category || session.tag || 'Study session'}</span>
-                    <span className="text-xs text-slate-500">{session.subject || 'Subject not set'}</span>
+            {[...studySessions]
+              .sort(
+                (a, b) =>
+                  (b.timestamp || b.completedAt || 0) -
+                  (a.timestamp || a.completedAt || 0),
+              )
+              .slice(0, 8)
+              .map((session) => (
+                <div
+                  key={session.id || `${session.timestamp}-${session.category}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-md px-2 py-1 text-[10px] font-extrabold uppercase ${session.type === "active" ? "bg-emerald-500/10 text-emerald-300" : "bg-violet-500/10 text-violet-300"}`}
+                      >
+                        {session.type === "active" ? "Active" : "Passive"}
+                      </span>
+                      <span className="text-sm font-bold text-white">
+                        {session.category || session.tag || "Study session"}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {session.subject || "Subject not set"}
+                      </span>
+                    </div>
+                    {session.note && (
+                      <p className="mt-1 truncate text-xs text-slate-400">
+                        {session.note}
+                      </p>
+                    )}
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {session.timestamp
+                        ? new Date(session.timestamp).toLocaleString()
+                        : session.dateStr || "Saved session"}
+                    </p>
                   </div>
-                  {session.note && <p className="mt-1 truncate text-xs text-slate-400">{session.note}</p>}
-                  <p className="mt-1 text-[11px] text-slate-500">{session.timestamp ? new Date(session.timestamp).toLocaleString() : session.dateStr || 'Saved session'}</p>
+                  <span className="text-sm font-extrabold text-slate-200">
+                    {formatDuration(session.durationSec)}
+                  </span>
                 </div>
-                <span className="text-sm font-extrabold text-slate-200">{formatDuration(session.durationSec)}</span>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </section>
 
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
         <h3 className="mb-4 font-bold text-white">Recent Question Logs</h3>
-        {questionLogs.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No question logs yet. Save an active study session and log your practice.</p> : (
+        {questionLogs.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-500">
+            No question logs yet. Save an active study session and log your
+            practice.
+          </p>
+        ) : (
           <div className="space-y-3">
-            {questionLogs.slice(0, 5).map(log => (
-              <div key={log.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                <div><p className="text-sm font-bold text-white">{log.subject} <span className="ml-2 rounded bg-indigo-500/10 px-2 py-0.5 text-xs font-normal text-indigo-300">{log.tag}</span></p><p className="mt-1 text-xs text-slate-500">{log.dateStr} · {log.timeMin} mins</p></div>
-                <div className="text-right"><p className="text-sm font-extrabold text-emerald-400">{log.correct} / {log.attempted}</p><p className="text-[10px] text-slate-500">Correct</p></div>
+            {questionLogs.slice(0, 5).map((log) => (
+              <div
+                key={log.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/40 p-3"
+              >
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    {log.subject}{" "}
+                    <span className="ml-2 rounded bg-indigo-500/10 px-2 py-0.5 text-xs font-normal text-indigo-300">
+                      {log.tag}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {log.dateStr} · {log.timeMin} mins
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-extrabold text-emerald-400">
+                    {log.correct} / {log.attempted}
+                  </p>
+                  <p className="text-[10px] text-slate-500">Correct</p>
+                </div>
               </div>
             ))}
           </div>
