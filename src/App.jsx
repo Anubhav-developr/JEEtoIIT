@@ -11,6 +11,7 @@ import MockTestPlanner from './components/MockTestPlanner';
 import AIAnalyzer from './components/AIAnalyzer';
 import CodeLogin from './components/CodeLogin';
 import { auth, db, firebaseReady } from './lib/firebase';
+import AdminPanel from "./components/AdminPanel";
 
 const EMPTY_STATE = {
   completedSubtopics: [],
