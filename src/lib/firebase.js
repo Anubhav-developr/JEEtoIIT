@@ -1,5 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { initializeAuth, browserLocalPersistence } from "firebase/auth";
+import {
+  initializeAuth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 import {
@@ -47,9 +51,10 @@ if (firebaseReady) {
   });
 
   // Initialize Firebase services only after App Check.
- auth = initializeAuth(app, {
-   persistence: browserLocalPersistence,
- });
+auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+  popupRedirectResolver: browserPopupRedirectResolver,
+});
   db = getFirestore(app);
   functions = getFunctions(app, "us-central1");
 }
