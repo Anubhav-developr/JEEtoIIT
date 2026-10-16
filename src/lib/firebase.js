@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeAuth, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 import {
@@ -47,7 +47,9 @@ if (firebaseReady) {
   });
 
   // Initialize Firebase services only after App Check.
-  auth = getAuth(app);
+ auth = initializeAuth(app, {
+   persistence: browserLocalPersistence,
+ });
   db = getFirestore(app);
   functions = getFunctions(app, "us-central1");
 }
