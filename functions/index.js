@@ -15,6 +15,23 @@ const db = getFirestore();
 const CODE_PATTERN = /^[A-Z0-9]{5}$/;
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
+const ADMIN_EMAIL = "anubhavm1234@gmail.com";
+
+function assertPortalAdmin(request) {
+  const email = String(request.auth?.token?.email || "")
+    .trim()
+    .toLowerCase();
+  if (
+    !request.auth ||
+    request.auth.token.admin !== true ||
+    email !== ADMIN_EMAIL
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only the designated portal admin can perform this action.",
+    );
+  }
+}
 
 function hashIp(ip) {
   // Avoid storing a raw IP address in Firestore.
@@ -54,7 +71,6 @@ async function enforceRateLimit(ip) {
     );
   });
 }
-
 
 exports.loginWithAccessCode = onCall(
   {
@@ -156,7 +172,6 @@ exports.loginWithAccessCode = onCall(
   },
 );
 
-
 exports.approveStudentRegistration = onCall(
   {
     enforceAppCheck: true,
@@ -165,12 +180,7 @@ exports.approveStudentRegistration = onCall(
   },
   async (request) => {
     // Only an authenticated admin can approve registrations.
-    if (!request.auth || request.auth.token.admin !== true) {
-      throw new HttpsError(
-        "permission-denied",
-        "Only an authorized admin can approve registrations.",
-      );
-    }
+    assertPortalAdmin(request);
 
     const uid = String(request.data?.uid || "").trim();
 
@@ -329,7 +339,6 @@ exports.approveStudentRegistration = onCall(
   },
 );
 
-
 exports.submitStudentRegistration = onCall(
   {
     enforceAppCheck: true,
@@ -347,9 +356,9 @@ exports.submitStudentRegistration = onCall(
       request.rawRequest?.headers?.["x-forwarded-for"] ||
       "unknown";
 
-   console.log("[REGISTRATION DEBUG] Before rate limit");
-   await enforceRateLimit(ip);
-   console.log("[REGISTRATION DEBUG] After rate limit");
+    console.log("[REGISTRATION DEBUG] Before rate limit");
+    await enforceRateLimit(ip);
+    console.log("[REGISTRATION DEBUG] After rate limit");
 
     const name = String(request.data?.name || "").trim();
     const targetExam = String(request.data?.targetExam || "").trim();
@@ -499,3 +508,142 @@ exports.submitStudentRegistration = onCall(
   },
 );
 
+exports.bootstrapAdmin = onCall(
+  {
+    enforceAppCheck: true,
+    maxInstances: 1,
+    timeoutSeconds: 20,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "Sign in with the designated Google account first.",
+      );
+    }
+
+    const token = request.auth.token || {};
+    const email = String(token.email || "")
+      .trim()
+      .toLowerCase();
+    const provider = token.firebase?.sign_in_provider;
+
+    // This is an allowlisted bootstrap for one verified Google identity only.
+    if (
+      email !== ADMIN_EMAIL ||
+      token.email_verified !== true ||
+      provider !== "google.com"
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only the designated verified Google account can bootstrap portal admin access.",
+      );
+    }
+
+    const auth = getAuth();
+    const user = await auth.getUser(request.auth.uid);
+    if (
+      !user.emailVerified ||
+      String(user.email || "")
+        .trim()
+        .toLowerCase() !== ADMIN_EMAIL
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "The Firebase Auth user does not match the verified admin identity.",
+      );
+    }
+
+    // One-time UID lock. If claim assignment fails, the same UID can safely retry;
+    // no other UID can take over this bootstrap record.
+    const bootstrapRef = db.collection("portalSecurity").doc("adminBootstrap");
+    await db.runTransaction(async (tx) => {
+      const existing = await tx.get(bootstrapRef);
+      if (existing.exists) {
+        if (existing.data().uid !== user.uid) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Admin bootstrap was already assigned to another UID.",
+          );
+        }
+        return;
+      }
+      tx.create(bootstrapRef, {
+        uid: user.uid,
+        email: ADMIN_EMAIL,
+        createdAt: Timestamp.now(),
+      });
+    });
+
+    // Preserve any existing claims while adding the single admin authorization flag.
+    await auth.setCustomUserClaims(user.uid, {
+      ...(user.customClaims || {}),
+      admin: true,
+    });
+
+    console.info("[ADMIN_BOOTSTRAP] Designated admin claim set.");
+    return { success: true };
+  },
+);
+
+exports.listPendingStudentRegistrations = onCall(
+  {
+    enforceAppCheck: true,
+    maxInstances: 3,
+    timeoutSeconds: 20,
+  },
+  async (request) => {
+    assertPortalAdmin(request);
+
+    const snapshot = await db
+      .collection("pendingRegistrations")
+      .where("status", "==", "pending")
+      .limit(100)
+      .get();
+
+    const auth = getAuth();
+    let legacyRecordsSkipped = 0;
+
+    const checks = await Promise.all(
+      snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+
+        // Old records used a hashed-email document ID. Never allow these records
+        // to be approved as if their ID were a Firebase Authentication UID.
+        if (
+          data.uid !== docSnap.id ||
+          typeof data.email !== "string" ||
+          !data.email.trim()
+        ) {
+          legacyRecordsSkipped += 1;
+          return null;
+        }
+
+        try {
+          const student = await auth.getUser(docSnap.id);
+          return {
+            uid: docSnap.id,
+            name: String(data.name || student.displayName || ""),
+            email: String(student.email || data.email).toLowerCase(),
+            targetExam: String(data.targetExam || ""),
+            status: String(data.status || "pending"),
+            emailVerified: student.emailVerified === true,
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+          };
+        } catch (error) {
+          // Missing Auth accounts are not actionable; never expose their raw records.
+          legacyRecordsSkipped += 1;
+          return null;
+        }
+      }),
+    );
+
+    const registrations = checks
+      .filter(Boolean)
+      .sort((a, b) =>
+        String(a.createdAt || "").localeCompare(String(b.createdAt || "")),
+      );
+
+    return { success: true, registrations, legacyRecordsSkipped };
+  },
+);
